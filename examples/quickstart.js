@@ -7,6 +7,7 @@ let https = require('https');
 let q = require('q');
 let url = require('url');
 let _ = require('lodash');
+let fs = require('fs');
 try {
   // if running from repo
   Wit = require('../').Wit;
@@ -59,7 +60,7 @@ const actions = {
           console.log('calling get');
           get(theUrl.hostname, theUrl.path)
             .then(function(res){
-              context.contacts = findEmailAddresses(res);
+              context.contacts = findEmailAddresses(res, theUrl.hostname);
               delete context.missingLocation;
               return resolve(context);
             });
@@ -69,7 +70,7 @@ const actions = {
           getSecure(theUrl.hostname, theUrl.path)
             .then(function(res){
               console.log(res.length);
-              context.contacts = findEmailAddresses(res);
+              context.contacts = findEmailAddresses(res, theUrl.hostname);
               delete context.missingLocation;
               return resolve(context);
             });
@@ -79,8 +80,6 @@ const actions = {
         delete context.contacts;
       }
     });
-  },
-  get(target){
   },
 };
 
@@ -120,7 +119,7 @@ function getSecure(host, path){
   return deferred.promise;
 };
 
-function findEmailAddresses(body){
+function findEmailAddresses(body, fileName){
   var separateEmailsBy = ", ";
   var email = "<none>"; // if no match, use this
   var emailsArray = body.match(/[A-Z0-9._%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi);
@@ -132,8 +131,9 @@ function findEmailAddresses(body){
         email += separateEmailsBy;
       email += emailsArray[i];
     }
+    fs.writeFile(fileName + "_contacts.csv", _.join(emailsArray, ','))
+    return email;
   }
-  return email;
 }
 
 const client = new Wit({accessToken, actions});

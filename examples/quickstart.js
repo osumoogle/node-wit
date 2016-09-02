@@ -2,6 +2,10 @@
 
 let Wit = null;
 let interactive = null;
+let http = require('http');
+let https = require('https');
+let q = require('q');
+let url = require('url');
 try {
   // if running from repo
   Wit = require('../').Wit;
@@ -43,20 +47,90 @@ const actions = {
       return resolve();
     });
   },
-  getForecast({context, entities}) {
+  findContacts({context, entities}) {
     return new Promise(function(resolve, reject) {
-      var location = firstEntityValue(entities, 'location')
-      if (location) {
-        context.forecast = 'sunny in ' + location; // we should call a weather API here
-        delete context.missingLocation;
+      var target = firstEntityValue(entities, 'target')
+      if (target) {
+        var theUrl = url.parse(target);
+        console.log(theUrl);
+        var body = '';
+        if(theUrl.protocol === 'http:'){
+          console.log('calling get');
+          get(theUrl.host, theUrl.path)
+            .then(function(res){
+              context.contacts = findEmailAddresses(body);
+              delete context.missingLocation;
+              return resolve(context);
+            });
+        }
+        else{
+          console.log('calling getSecure');
+          getSecure(theUrl.host, theUrl.path)
+            .then(function(res){
+              context.contacts = findEmailAddresses(res);
+              delete context.missingLocation;
+              return resolve(context);
+            });
+        }
       } else {
-        context.missingLocation = true;
-        delete context.forecast;
+        context.missingTarget = true;
+        delete context.contacts;
       }
-      return resolve(context);
     });
   },
+  get(target){
+  },
 };
+
+function get(host, path){
+  var deferred = q.defer();
+  http.get({
+    host: host,
+    path: path,
+  }, function(response){
+    var body = '';
+    response.on('data', function(d){
+      body += d;
+    });
+    response.on('end', function(){
+      deferred.resolve(body);
+    });
+  });
+  return deferred.promise;
+};
+
+function getSecure(host, path){
+  var deferred = q.defer();
+  https.get({
+    host: host,
+    path: path
+  }, function(response){
+    var body = '';
+    response.on('data', function(d){
+      body += d;
+    });
+    response.on('end', function(){
+      deferred.resolve(body);
+    });
+  });
+  return deferred.promise;
+};
+
+function findEmailAddresses(body){
+  var separateEmailsBy = ", ";
+  var email = "<none>"; // if no match, use this
+  var emailsArray = body.match(/[A-Z0-9._%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi);
+  console.log(emailsArray);
+  if (emailsArray) {
+    email = "";
+    for (var i = 0; i < emailsArray.length; i++) {
+      if (i != 0) 
+        email += separateEmailsBy;
+      email += emailsArray[i];
+    }
+  }
+  return email;
+}
 
 const client = new Wit({accessToken, actions});
 interactive(client);

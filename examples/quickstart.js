@@ -6,6 +6,7 @@ let http = require('http');
 let https = require('https');
 let q = require('q');
 let url = require('url');
+let _ = require('lodash');
 try {
   // if running from repo
   Wit = require('../').Wit;
@@ -56,17 +57,18 @@ const actions = {
         var body = '';
         if(theUrl.protocol === 'http:'){
           console.log('calling get');
-          get(theUrl.host, theUrl.path)
+          get(theUrl.hostname, theUrl.path)
             .then(function(res){
-              context.contacts = findEmailAddresses(body);
+              context.contacts = findEmailAddresses(res);
               delete context.missingLocation;
               return resolve(context);
             });
         }
         else{
           console.log('calling getSecure');
-          getSecure(theUrl.host, theUrl.path)
+          getSecure(theUrl.hostname, theUrl.path)
             .then(function(res){
+              console.log(res.length);
               context.contacts = findEmailAddresses(res);
               delete context.missingLocation;
               return resolve(context);
@@ -103,7 +105,9 @@ function getSecure(host, path){
   var deferred = q.defer();
   https.get({
     host: host,
-    path: path
+    path: path,
+    method: 'GET',
+    port: 443
   }, function(response){
     var body = '';
     response.on('data', function(d){
@@ -120,8 +124,8 @@ function findEmailAddresses(body){
   var separateEmailsBy = ", ";
   var email = "<none>"; // if no match, use this
   var emailsArray = body.match(/[A-Z0-9._%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi);
-  console.log(emailsArray);
   if (emailsArray) {
+    emailsArray = _.uniq(emailsArray);
     email = "";
     for (var i = 0; i < emailsArray.length; i++) {
       if (i != 0) 
